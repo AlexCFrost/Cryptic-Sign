@@ -1,6 +1,6 @@
 const balanceService = require("../Balance/balanceService");
 const { secp256k1 } = require("ethereum-cryptography/secp256k1");
-const { toHex, utf8ToBytes, hexToBytes} = require("ethereum-cryptography/utils");
+const { toHex, utf8ToBytes, hexToBytes } = require("ethereum-cryptography/utils");
 const { keccak256 } = require("ethereum-cryptography/keccak");
 
 function getBalance(req, res) {
@@ -9,7 +9,7 @@ function getBalance(req, res) {
   res.send({ balance });
 }
 
-// Function to has transaction data.
+// Function to hash transaction data.
 function hashTransaction(sender, recipient, amount) {
   return keccak256(utf8ToBytes(JSON.stringify({
     sender, recipient, amount
@@ -25,32 +25,39 @@ function sendAmount(req, res) {
       return res.status(400).send({ message: "Transaction must be signed" });
     }
     
-    // Convert signature from JSON format to secp256k1 expects
-    const sig = {
-      r: BigInt(signature.r),
-      s: BigInt(signature.s),
-      recovery: signature.recovery
-    };
-    
     // Hash the transaction data
     const transactionHash = hashTransaction(sender, recipient, amount);
+    console.log("Transaction hash:", toHex(transactionHash));
     
-    // Verify the signature
     try {
-      // Attempt to recover the public key from the signature
-      const recoveredPublicKey = secp256k1.recoverPublicKey(
-        toHex(transactionHash),
-        { r: sig.r, s: sig.s },
-        sig.recovery
-      );
+      const signatureBytes = hexToBytes(signature.signature);
+      const recoveryBit = signature.recovery;
       
-      // Convert to hex format to match our stored addresses
+      let recoveredPublicKey;
+      
+      try {
+        const signatureObj = secp256k1.Signature.fromCompact(signatureBytes);
+        signatureObj.recovery = recoveryBit;
+        recoveredPublicKey = signatureObj.recoverPublicKey(transactionHash).toRawBytes();
+      } catch (e) {
+        try {
+          recoveredPublicKey = secp256k1.recover(transactionHash, signatureBytes, recoveryBit);
+        } catch (e2) {
+          throw new Error("Could not recover public key using any available method");
+        }
+      }
+      
+      // Get the address from the public key
       const recoveredAddress = toHex(recoveredPublicKey);
+      console.log("Recovered address:", recoveredAddress);
+      console.log("Sender address:", sender);
       
       // Check if recovered address matches the sender
-      if (recoveredAddress !== sender) {
+      if (recoveredAddress.toLowerCase() !== sender.toLowerCase()) {
         return res.status(400).send({ 
-          message: "Invalid signature: Recovered address doesn't match sender" 
+          message: "Invalid signature: Recovered address doesn't match sender",
+          expected: sender,
+          recovered: recoveredAddress
         });
       }
       
@@ -58,11 +65,13 @@ function sendAmount(req, res) {
       const updatedBalance = balanceService.send(sender, recipient, amount);
       res.send({ balance: updatedBalance });
     } catch (error) {
+      console.error("Signature verification error:", error);
       return res.status(400).send({ 
         message: "Invalid signature: " + error.message
       });
     }
   } catch (error) {
+    console.error("Transaction processing error:", error);
     res.status(400).send({ message: error.message });
   }
 }

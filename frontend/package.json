@@ -12,6 +12,7 @@
     "axios": "^1.8.4",
     "ethereum-cryptography": "^3.1.0",
     "next": "15.3.1",
+    "nodemon": "^3.1.9",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

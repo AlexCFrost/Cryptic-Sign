@@ -1,3 +1,5 @@
+// Generate random private and public key.
+
 const {secp256k1} = require("ethereum-cryptography/secp256k1")
 const {toHex} = require("ethereum-cryptography/utils");
 // const {randomBytes}  = require("crypto"); alternative for privateKey generation.

@@ -10,7 +10,7 @@ function Page() {
   const [privateKey, setPrivateKey] = useState("");
 
   return (
-    <div className="app">
+    <div className="page">
       
       <Wallet
         balance={balance}
